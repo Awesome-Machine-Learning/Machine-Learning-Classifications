@@ -1,100 +1,81 @@
-# Import the libraries
-import math
-import numpy as np
+#Importing basic libaries
 import pandas as pd
-from datetime import datetime
-
+import numpy as np
+import warnings
 import seaborn as sns
 import matplotlib.pyplot as plt
-%matplotlib inline 
-plt.style.use('seaborn-whitegrid')
 
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.metrics import classification_report
-from sklearn.metrics import confusion_matrix
+#Reading in data
+df = pd.read_csv('villagers.csv')
 
-# Import the data
-df = pd.read_csv('data/00 df.csv')
-
-
-# Split data into Train & test
-train = df[df['flag']=='train']
-test = df[df['flag']=='test']
-
-cat_feats = ['age_bin','capital_gl_bin','education_bin','hours_per_week_bin','msr_bin','occupation_bin','race_sex_bin']
-
-y_train = train['y']
-x_train = train[['age_bin','capital_gl_bin','education_bin','hours_per_week_bin','msr_bin','occupation_bin','race_sex_bin']]
-x_train = pd.get_dummies(x_train,columns=cat_feats,drop_first=True)
-
-y_test = test['y']
-x_test = test[['age_bin','capital_gl_bin','education_bin','hours_per_week_bin','msr_bin','occupation_bin','race_sex_bin']]
-x_test = pd.get_dummies(x_test,columns=cat_feats,drop_first=True)
+print('Data:')
+print(df)
+df.head()
 
 
 
-# Decision Tree
-results = []
-max_depth_options = [2,4,6,8,10,12,14,16,18,20]
-for trees in max_depth_options:
-    model = DecisionTreeClassifier(max_depth=trees, random_state=101)
-    model.fit(x_train, y_train)
-    y_pred = model.predict(x_test)
-    accuracy = np.mean(y_test==y_pred)
-    results.append(accuracy)
+print(df.shape)
+print(df.groupby('Name').size())
+print(df['Gender'].value_counts())
 
-    
-# Plot the data
-plt.figure(figsize=(8,4))
-pd.Series(results, max_depth_options).plot(color="darkred",marker="o")
+#Encoding
+from sklearn.preprocessing import LabelEncoder
 
+lb = LabelEncoder() 
+df['Gender'] = lb.fit_transform(df['Gender'])
+df['Name'] = lb.fit_transform(df['Name'])
+df['Species'] = lb.fit_transform(df['Species'])
+df['Personality'] = lb.fit_transform(df['Personality'])
+df['Birthday'] = lb.fit_transform(df['Birthday'])
 
+# Select Features
+feature = df.drop('Gender', axis=1)
 
-results = []
-max_features_options = ['auto',None,'sqrt',0.95,0.75,0.5,0.25,0.10]
-for trees in max_features_options:
-    model = DecisionTreeClassifier(max_depth=10, random_state=101, max_features = trees)
-    model.fit(x_train, y_train)
-    y_pred = model.predict(x_test)
-    accuracy = np.mean(y_test==y_pred)
-    results.append(accuracy)
+# Select Target
+target = df['Gender']
 
-plt.figure(figsize=(8,4))
-pd.Series(results, max_features_options).plot(kind="bar",color="darkred",ylim=(0.7,0.9))
+# Set Training and Testing Data
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(feature , target, 
+                                                    shuffle = True, 
+                                                    random_state=42,
+                                                    test_size=0.2)
 
+# Show the Training and Validation Data
+print('Shape of training feature:', X_train.shape)
+print('Shape of testing feature:', X_test.shape)
+print('Shape of training label:', y_train.shape)
+print('Shape of training label:', y_test.shape)
 
+from sklearn.linear_model import LogisticRegression
+logreg = LogisticRegression(penalty='l2', C=1.0)
 
-results = []
-min_samples_leaf_options = [5,10,15,20,25,30,35,40,45,50]
-for trees in min_samples_leaf_options:
-    model = DecisionTreeClassifier(max_depth=10, random_state=101, max_features = None, min_samples_leaf = trees)
-    model.fit(x_train, y_train)
-    y_pred = model.predict(x_test)
-    accuracy = np.mean(y_test==y_pred)
-    results.append(accuracy)
+# Train the model on the training data
+logreg.fit(X_train, y_train)
 
-plt.figure(figsize=(8,4))
-pd.Series(results, min_samples_leaf_options).plot(color="darkred",marker="o")
+# Predict the target labels on the test set
+y_test_pred = logreg.predict(X_test)
 
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import f1_score
 
+# Calculate accuracy and other evaluation metrics
+accuracy = accuracy_score(y_test, y_test_pred)
+precision = precision_score(y_test, y_test_pred)
+recall = recall_score(y_test, y_test_pred)
+f1_score = f1_score(y_test, y_test_pred)
 
-# DTC
-dtree = DecisionTreeClassifier(max_depth=10, random_state=101, max_features = None, min_samples_leaf = 15)
-dtree.fit(x_train, y_train)
-y_pred=dtree.predict(x_test)
+print('Accuracy:' , (accuracy))
+print('Demical: {:.2f}'.format(accuracy))
 
+print('Precision:' , (precision))
+print('Decimal: {:.2f}'.format(precision))
 
-test_calc = pd.concat([pd.DataFrame(y_test).reset_index(drop=True),pd.DataFrame(y_pred).reset_index(drop=True)],axis=1)
-test_calc.rename(columns={0: 'predicted'}, inplace=True)
+print('Recall:' , (recall))
+print('Decimal: {:.2f}'.format(recall))
 
-test_calc['predicted'] = test_calc['predicted'].apply(lambda x: 1 if x > 0.5 else 0)
-df_table = confusion_matrix(test_calc['y'],test_calc['predicted'])
-print (df_table)
+print('F1 Score:' , (f1_score))
+print('Decimal: {:.2f}'.format(f1_score))
 
-print('accuracy:', (df_table[0,0] + df_table[1,1]) / (df_table[0,0] + df_table[0,1] + df_table[1,0] + df_table[1,1]))
-print ('precision:', df_table[1,1] / (df_table[1,1] + df_table[0,1]))
-print('recall:', df_table[1,1] / (df_table[1,1] + df_table[1,0]))
-
-p = df_table[1,1] / (df_table[1,1] + df_table[0,1])
-r = df_table[1,1] / (df_table[1,1] + df_table[1,0])
-print('f1 score: ', (2*p*r)/(p+r))
